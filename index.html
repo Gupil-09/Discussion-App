@@ -42,8 +42,24 @@
             background-color: #fafafa;
             padding: 40px;
         }
+        h2, h3, h4 {
+            font-weight: 600;
+            color: #263238;
+        }
+        .left-pane h2 {
+            color: #fefefe;
+        }
+        #search-box {
+            width: 100%;
+            padding: 10px;
+            margin-top: 10px;
+            margin-bottom: 20px;
+            border-radius: 6px;
+            border: 1px solid #ccc;
+            font-size: 16px;
+        }
         #questions-list {
-            margin-top: 20px;
+            margin-top: 10px;
         }
         .question-item {
             background-color: #78909c;
@@ -52,13 +68,29 @@
             margin-bottom: 10px;
             cursor: pointer;
             transition: background-color 0.3s ease;
+            position: relative;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
         }
         .question-item:hover {
             background-color: #90a4ae;
         }
-        h2, h3, h4 {
-            font-weight: 600;
-            color: #263238;
+        .vote-buttons {
+            display: flex;
+            align-items: center;
+        }
+        .vote-buttons button {
+            background: none;
+            border: none;
+            color: white;
+            font-size: 20px;
+            cursor: pointer;
+            margin: 0 5px;
+        }
+        .vote-buttons span {
+            font-size: 16px;
+            margin: 0 5px;
         }
         form input, form textarea, form button {
             width: 100%;
@@ -87,6 +119,27 @@
             border-radius: 6px;
             margin-bottom: 10px;
             box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+            position: relative;
+            padding-right: 70px;
+        }
+        .response-vote-buttons {
+            position: absolute;
+            right: 10px;
+            top: 10px;
+            display: flex;
+            align-items: center;
+        }
+        .response-vote-buttons button {
+            background: none;
+            border: none;
+            color: #333;
+            font-size: 18px;
+            cursor: pointer;
+            margin: 0 5px;
+        }
+        .response-vote-buttons span {
+            font-size: 16px;
+            margin: 0 5px;
         }
         #resolve-btn {
             background-color: #d32f2f;
@@ -105,6 +158,7 @@
     <div class="discussion-app">
         <div class="left-pane">
             <h2>Questions</h2>
+            <input type="text" id="search-box" placeholder="Search Questions">
             <div id="questions-list"></div>
         </div>
         <div class="right-pane">
@@ -140,6 +194,7 @@
             const questionTextElem = document.getElementById('selected-question-text');
             const responsesDiv = document.getElementById('responses');
             const resolveBtn = document.getElementById('resolve-btn');
+            const searchBox = document.getElementById('search-box');
             let questions = [];
             let selectedQuestion = null;
             questionForm.addEventListener('submit', function(event) {
@@ -147,33 +202,63 @@
                 const title = document.getElementById('title').value;
                 const questionText = document.getElementById('question').value;
                 const newQuestion = {
-                    id: questions.length + 1,
+                    id: Date.now(),
                     title: title,
                     questionText: questionText,
-                    responses: []
+                    responses: [],
+                    upvotes: 0
                 };
                 questions.push(newQuestion);
                 renderQuestions();
                 questionForm.reset();
             });
-            function renderQuestions() {
+            function renderQuestions(searchTerm = '') {
                 questionsList.innerHTML = '';
-                questions.forEach(question => {
+                const filteredQuestions = questions
+                    .filter(question =>
+                        question.title.toLowerCase().includes(searchTerm)
+                    )
+                    .sort((a, b) => b.upvotes - a.upvotes);
+                filteredQuestions.forEach(question => {
                     const questionDiv = document.createElement('div');
                     questionDiv.className = 'question-item';
-                    questionDiv.textContent = question.title;
+                    questionDiv.innerHTML = `
+                        <span>${question.title}</span>
+                        <div class="vote-buttons">
+                            <button class="upvote-btn">▲</button>
+                            <span>${question.upvotes}</span>
+                            <button class="downvote-btn">▼</button>
+                        </div>
+                    `;
+                    const upvoteBtn = questionDiv.querySelector('.upvote-btn');
+                    const downvoteBtn = questionDiv.querySelector('.downvote-btn');
+                    upvoteBtn.addEventListener('click', (e) => {
+                        e.stopPropagation();
+                        question.upvotes++;
+                        renderQuestions(searchBox.value.toLowerCase());
+                    });
+                    downvoteBtn.addEventListener('click', (e) => {
+                        e.stopPropagation();
+                        question.upvotes--;
+                        renderQuestions(searchBox.value.toLowerCase());
+                    });
                     questionDiv.addEventListener('click', () => {
                         selectQuestion(question.id);
                     });
                     questionsList.appendChild(questionDiv);
                 });
             }
+            searchBox.addEventListener('input', function() {
+                const searchTerm = searchBox.value.toLowerCase();
+                renderQuestions(searchTerm);
+            });
             function selectQuestion(id) {
                 selectedQuestion = questions.find(q => q.id === id);
                 questionTitleElem.textContent = selectedQuestion.title;
                 questionTextElem.textContent = selectedQuestion.questionText;
                 renderResponses();
                 responseSection.style.display = 'block';
+                document.getElementById('question-form').style.display = 'none';
             }
             responseForm.addEventListener('submit', function(event) {
                 event.preventDefault();
@@ -181,7 +266,8 @@
                 const comment = document.getElementById('response-comment').value;
                 const newResponse = {
                     name: name,
-                    comment: comment
+                    comment: comment,
+                    upvotes: 0
                 };
                 selectedQuestion.responses.push(newResponse);
                 renderResponses();
@@ -189,18 +275,41 @@
             });
             function renderResponses() {
                 responsesDiv.innerHTML = '';
-                selectedQuestion.responses.forEach(response => {
+                const sortedResponses = selectedQuestion.responses.sort((a, b) => b.upvotes - a.upvotes);
+                sortedResponses.forEach(response => {
                     const responseDiv = document.createElement('div');
                     responseDiv.className = 'response-item';
-                    responseDiv.textContent = `${response.name}: ${response.comment}`;
+                    responseDiv.innerHTML = `
+                        <strong>${response.name}:</strong> ${response.comment}
+                        <div class="response-vote-buttons">
+                            <button class="response-upvote-btn">▲</button>
+                            <span>${response.upvotes}</span>
+                            <button class="response-downvote-btn">▼</button>
+                        </div>
+                    `;
+                    const upvoteBtn = responseDiv.querySelector('.response-upvote-btn');
+                    const downvoteBtn = responseDiv.querySelector('.response-downvote-btn');
+                    upvoteBtn.addEventListener('click', (e) => {
+                        e.stopPropagation();
+                        response.upvotes++;
+                        renderResponses();
+                    });
+                    downvoteBtn.addEventListener('click', (e) => {
+                        e.stopPropagation();
+                        response.upvotes--;
+                        renderResponses();
+                    });
                     responsesDiv.appendChild(responseDiv);
                 });
             }
             resolveBtn.addEventListener('click', function() {
                 questions = questions.filter(q => q.id !== selectedQuestion.id);
-                renderQuestions();
+                renderQuestions(searchBox.value.toLowerCase());
                 responseSection.style.display = 'none';
+                document.getElementById('question-form').style.display = 'block';
             });
+            document.getElementById('question-form').style.display = 'block';
+            responseSection.style.display = 'none';
         });
     </script>
 </body>
